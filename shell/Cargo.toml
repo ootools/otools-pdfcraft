@@ -1,0 +1,67 @@
+# PdfCraft 的 OTools 插件外壳。
+#
+# 这一层是我们自己的代码：它把上游 `apps/pdfcraft-web` 的浏览器外壳换成
+# 「OTools 插件外壳」——UI 仍然是上游的 `pdfcraft-ui-egui`（原封不动），
+# 唯一的区别是文件存在哪（见 `src/otools.rs`）。
+#
+# 上游源码在 `../upstream`（按 upstream.pin 的 commit 浅拉取，保持原样勿改），
+# 所以本 crate 用 path 依赖直接复用上游的 crate，不复制、不改动任何上游源码。
+[package]
+name = "otools-pdfcraft-shell"
+description = "PdfCraft as an OTools plugin: the upstream egui UI compiled to WebAssembly, with OTools host file I/O"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# 独立的 workspace：上游 `upstream/` 有自己的 workspace，本 crate 不能并进去
+# （它是 wasm-only 的，并进去会让宿主的 `cargo build` 也去编译 eframe/wgpu）。
+[workspace]
+
+[[bin]]
+name = "otools-pdfcraft"
+path = "src/main.rs"
+
+[dependencies]
+pdfcraft-ui-egui = { path = "../upstream/crates/ui-egui" }
+egui = { version = "0.36", default-features = false }
+log = { version = "0.4", default-features = false }
+
+# 只在 wasm 下需要的依赖（宿主/桌面下本 crate 什么都不做）
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+eframe = { version = "0.36", default-features = false, features = ["persistence", "default_fonts", "glow", "accesskit", "links"] }
+base64 = "0.22"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = [
+  "Document",
+  "Element",
+  "HtmlCanvasElement",
+  "HtmlElement",
+  "Location",
+  "Response",
+  "UrlSearchParams",
+  "Window",
+]
+
+# 上游 workspace 里的 `[patch.crates-io]` **不会**跟着 path 依赖带过来：
+# 补丁只在发起构建的那个 workspace 根节点生效。少了这一段，hayro / lopdf /
+# egui-wgpu 会退到 crates.io 的未打补丁版本（上游 vendor/ 里是改过的）。
+# 上游更新后要同步这里 —— 见 AGENTS.md。
+[patch.crates-io]
+hayro = { path = "../upstream/vendor/hayro" }
+hayro-interpret = { path = "../upstream/vendor/hayro-interpret" }
+hayro-syntax = { path = "../upstream/vendor/hayro-syntax" }
+hayro-jbig2 = { path = "../upstream/vendor/hayro-jbig2" }
+lopdf = { path = "../upstream/vendor/lopdf" }
+winit = { path = "../upstream/vendor/winit" }
+egui-wgpu = { path = "../upstream/vendor/egui-wgpu" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16

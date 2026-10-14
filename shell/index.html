@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>PdfCraft</title>
+  <link data-trunk rel="rust" data-bin="otools-pdfcraft" data-wasm-opt="z" data-weak-refs />
+  <link data-trunk rel="copy-file" href="favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f1f3; }
+    #pdfcraft { width: 100%; height: 100%; display: block; outline: none; }
+    #pdfcraft_loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #6b6b70; font: 14px system-ui, sans-serif; pointer-events: none; }
+    @media (prefers-color-scheme: dark) {
+      html, body { background: #19191c; }
+      #pdfcraft_loading { color: #9a9aa0; }
+    }
+  </style>
+  <script>
+    /*
+     * OTools 宿主桥（插件唯一需要写的 JS）。
+     * ------------------------------------------------------------------
+     * 上游 PdfCraft 的网页版没有文件系统：保存走浏览器下载。OTools 宿主注入了
+     * `window.otools`，提供真正的另存对话框与磁盘读写，所以这里把「另存 / 写文件」
+     * 换成宿主调用；WASM 侧（shell/src/otools.rs）通过 wasm-bindgen 直接调下面这几个函数。
+     *
+     * 宿主能力有两条路，任一条通就算「在 OTools 里」：
+     *   1. `window.otools` / `window.utools`：宿主注入的包装 API（dialog.save + writeHostFile）。
+     *   2. `window.__TAURI_INTERNALS__.invoke`：Tauri 原生 IPC，可直接调
+     *      `tools_webview_pick_save_path` / `tools_webview_write_file`。
+     * 两条路都不通（把 dist 拖进普通浏览器）才退回上游的浏览器下载。
+     *
+     * 实测个别 webview 里整段 init script 的后半段不到岗（`window.otools` 没定义），
+     * 此时第 2 条路照样能弹宿主对话框、读写宿主文件；只认第 1 条路会让插件
+     * **静默**退化成浏览器下载——每次保存都下一个新文件，正是要避免的事故。
+     *
+     * 不依赖 otools-plugin-sdk：插件是纯 Rust/WASM 应用，没有前端打包环节。
+     */
+    (function () {
+      var NAME_MAP_KEY = 'pdfcraft.otools.paths';
+      var DIAG_KEY = 'pdfcraft.otools.diag';
+      var PDF_FILTERS = [{ name: 'PDF', extensions: ['pdf'] }];
+
+      function baseName(p) {
+        var s = String(p || '');
+        var i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+        return i >= 0 ? s.slice(i + 1) : s;
+      }
+
+      // 「文件名 -> 上次真实落盘路径」的映射，让再次保存不再弹对话框。
+      function loadMap() {
+        try { return JSON.parse(window.localStorage.getItem(NAME_MAP_KEY) || '{}') || {}; } catch (e) { return {}; }
+      }
+      function saveMap(map) {
+        try { window.localStorage.setItem(NAME_MAP_KEY, JSON.stringify(map)); } catch (e) { /* 忽略 */ }
+      }
+
+      // 诊断面包屑：宿主走了哪条路、每次保存落到哪，写进 localStorage 便于排查
+      // （插件没有 devtools，这是事后唯一能看到页面内部状态的渠道）。
+      function diag(patch) {
+        try {
+          var d = JSON.parse(window.localStorage.getItem(DIAG_KEY) || '{}') || {};
+          for (var k in patch) d[k] = patch[k];
+          d.at = new Date().toISOString();
+          window.localStorage.setItem(DIAG_KEY, JSON.stringify(d));
+        } catch (e) { /* 忽略 */ }
+      }
+
+      function fail(message) { return Promise.reject(new Error(message)); }
+
+      /** 完整的宿主包装 API，没有则返回 null。 */
+      function wrapper() {
+        var a = (typeof window !== 'undefined' && (window.otools || window.utools)) || null;
+        return a && a.dialog && typeof a.dialog.save === 'function' && typeof a.writeHostFile === 'function' ? a : null;
+      }
+
+      /** Tauri 原生 IPC（包装没注入时的兜底通道；普通浏览器里没有）。 */
+      function tauriInvoke() {
+        var candidates = [window];
+        try { if (window.parent && window.parent !== window) candidates.push(window.parent); } catch (e) { /* 跨域，忽略 */ }
+        try { if (window.top && window.top !== window) candidates.push(window.top); } catch (e) { /* 跨域，忽略 */ }
+        for (var i = 0; i < candidates.length; i++) {
+          var t = candidates[i] && candidates[i].__TAURI_INTERNALS__;
+          if (t && typeof t.invoke === 'function') return t.invoke.bind(t);
+        }
+        return null;
+      }
+
+      function hostReady() { return !!wrapper() || !!tauriInvoke(); }
+
+      function firstPath(picked) {
+        if (Array.isArray(picked)) return picked.length ? picked[0] : null;
+        if (picked && typeof picked === 'object' && typeof picked.path === 'string') return picked.path.trim() || null;
+        return typeof picked === 'string' ? (picked.trim() || null) : null;
+      }
+
+      function writeHostFile(path, dataBase64) {
+        // `tools_webview_write_file(request: WebviewWriteFileRequest)` 收的是名为 `request`
+        // 的结构体，平铺 `{path, dataBase64}` 会被拒掉（missing required key `request`）。
+        var invoke = tauriInvoke();
+        if (invoke) {
+          return invoke('tools_webview_write_file', { request: { path: path, dataBase64: dataBase64 } }).catch(function (rawError) {
+            var a = wrapper();
+            if (a) return a.writeHostFile({ path: path, dataBase64: dataBase64 });
+            throw rawError;
+          });
+        }
+        var a = wrapper();
+        if (a) return a.writeHostFile({ path: path, dataBase64: dataBase64 });
+        return fail('OTools 宿主不可用');
+      }
+
+      /** 拆默认路径为「目录 + 建议名」。 */
+      function splitPath(p) {
+        var s = String(p || '').trim();
+        if (!s) return { directory: undefined, fileName: undefined };
+        var m = s.match(/^(.*[\\/])([^\\/]+)$/);
+        if (!m) return { directory: undefined, fileName: s };
+        return { directory: m[1].replace(/[\\/]+$/, '') || undefined, fileName: m[2].trim() || undefined };
+      }
+
+      /** 弹另存对话框，返回选中的路径（取消为 null）。 */
+      function pickSavePath(defaultPath) {
+        var a = wrapper();
+        if (a) return a.dialog.save({ title: '保存 PDF', defaultPath: defaultPath, filters: PDF_FILTERS }).then(firstPath);
+        var invoke = tauriInvoke();
+        if (!invoke) return fail('OTools 宿主不可用');
+        var sp = splitPath(defaultPath);
+        return invoke('tools_webview_pick_save_path', {
+          options: { title: '保存 PDF', suggestedName: sp.fileName, directory: sp.directory, filters: PDF_FILTERS },
+        }).then(function (meta) {
+          if (!meta) return null;
+          return typeof meta === 'string' ? meta.trim() || null : (meta.path ? String(meta.path).trim() || null : null);
+        });
+      }
+
+      window.pdfcraftOtools = {
+        /** 是否运行在 OTools 宿主里（两条宿主通道任一条通即为真；否则退回上游的浏览器下载）。 */
+        available: function () {
+          var a = wrapper();
+          if (a) { diag({ bridge: 'wrapper', host: true }); return true; }
+          var raw = !!tauriInvoke();
+          if (raw) {
+            diag({ bridge: 'raw', host: true });
+            try { console.warn('[pdfcraftOtools] window.otools 包装缺失，改用 Tauri IPC 直连 tools_webview_* 命令'); } catch (e) { /* 忽略 */ }
+          } else {
+            diag({ bridge: 'none', host: false });
+          }
+          return raw;
+        },
+
+        /** OTools 的界面主题（dark/light/空串），用于给 egui 选初始主题。 */
+        theme: function () {
+          if (typeof document === 'undefined') return '';
+          var cl = document.documentElement && document.documentElement.classList;
+          if (!cl) return '';
+          if (cl.contains('dark')) return 'dark';
+          if (cl.contains('light')) return 'light';
+          return '';
+        },
+
+        /**
+         * 保存 PDF。
+         * @param {{name: string, dataBase64: string, forcePick: boolean}} request
+         *   `forcePick` 为真时总是弹另存对话框（对应「另存为」），否则若该文件名
+         *   上次存过就静默覆盖（对应「保存」）。
+         * @returns {Promise<{path: string}|null>} null 表示用户在对话框里取消了。
+         */
+        saveFile: function (request) {
+          var req = request || {};
+          var name = String(req.name || 'document.pdf');
+          if (!hostReady()) return fail('OTools 保存对话框不可用');
+
+          var map = loadMap();
+          var known = map[name];
+          if (!req.forcePick && known) {
+            return writeHostFile(known, req.dataBase64).then(function () {
+              diag({ lastSave: known, lastSaveMode: 'overwrite' });
+              return { path: known };
+            });
+          }
+          return pickSavePath(known || name).then(function (path) {
+            if (!path) return null;
+            map[name] = path;
+            saveMap(map);
+            return writeHostFile(path, req.dataBase64).then(function () {
+              diag({ lastSave: path, lastSaveMode: 'dialog' });
+              return { path: path };
+            });
+          });
+        }
+      };
+    })();
+  </script>
+</head>
+<body>
+  <canvas id="pdfcraft"></canvas>
+  <div id="pdfcraft_loading">正在加载 PdfCraft…</div>
+</body>
+</html>

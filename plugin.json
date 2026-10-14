@@ -1,0 +1,29 @@
+{
+  "devUrl": "http://127.0.0.1:6483",
+  "developerName": "jry",
+  "displayName": "PdfCraft",
+  "displayNameCN": "PDF 工作台",
+  "entry": "dist/index.html",
+  "quickDev": true,
+  "hasAd": false,
+  "icon": "📕",
+  "inPluginPurchase": false,
+  "key": [
+    "pdf",
+    "pdfcraft",
+    "acrobat",
+    "PDF",
+    "阅读",
+    "批注",
+    "合并",
+    "拆分",
+    "表单",
+    "签名"
+  ],
+  "openInBrowser": false,
+  "packid": "otools-pdfcraft",
+  "screenshots": [],
+  "summary": "PdfCraft（开源、纯 Rust 重写的 Adobe Acrobat 式 PDF 工作台）的 OTools 插件版：阅读批注、合并拆分、重排加密、表单与签名。",
+  "uuid": "otools-pdfcraft",
+  "version": "0.1.0"
+}
