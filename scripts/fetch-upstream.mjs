@@ -108,7 +108,9 @@ for (const [label, url] of transports) {
   }
   if (!fetched) continue;
 
-  const checkout = exec(['checkout', '--detach', 'FETCH_HEAD'], upstreamDir);
+  // `-f` 是必须的：上游目录是只读构建输入，工作区里的换行符/时间戳差异会让
+  // 普通 checkout 直接 abort（AGENTS.md：上游一行都不要改，丢了不心疼）。
+  const checkout = exec(['checkout', '-f', '--detach', 'FETCH_HEAD'], upstreamDir);
   if (checkout.status !== 0) {
     console.error(`  检出失败：${checkout.stderr?.trim()}`);
     continue;
