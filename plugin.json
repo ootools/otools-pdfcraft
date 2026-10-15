@@ -2,7 +2,7 @@
   "devUrl": "http://127.0.0.1:6483",
   "developerName": "jry",
   "displayName": "PdfCraft",
-  "displayNameCN": "PDF 工作台",
+  "displayNameCN": "PDFCraft",
   "entry": "dist/index.html",
   "quickDev": true,
   "hasAd": false,

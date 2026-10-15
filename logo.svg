@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#2563eb"/>
-  <text x="32" y="44" font-family="Segoe UI Symbol, Apple Color Emoji, Noto Color Emoji, sans-serif" font-size="32" text-anchor="middle">📕</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="PdfCraft">
+  <defs>
+    <linearGradient id="bg-pdfcraft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg-pdfcraft)"/>
+  <g fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M36 22 H74 L94 42 V106 H36 Z"/>
+    <path d="M74 22 V42 H94"/>
+    <path d="M48 60 H82 M48 74 H82 M48 88 H68" stroke-width="5"/>
+  </g>
 </svg>
