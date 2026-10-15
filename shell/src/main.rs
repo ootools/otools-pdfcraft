@@ -88,6 +88,11 @@ mod web {
                     options,
                     Box::new(|cc| {
                         let mut app = PdfCraftApp::new();
+                        // wasm 读不到系统字体：内嵌 CJK + 阿拉伯 fallback，否则中文/日文/阿拉伯文方框。
+                        pdfcraft_ui_egui::theme::set_extra_fallback_fonts(vec![
+                            ("otools-cjk".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/otools-cjk-subset.ttf")))),
+                            ("otools-arabic".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/otools-arabic-subset.ttf")))),
+                        ]);
                         // "printcraft"：以应用旧名保存过的设置。
                         if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string("printcraft"))) {
                             app.restore(&json);

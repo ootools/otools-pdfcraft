@@ -84,6 +84,39 @@ index 3e70f34..07439d1 100644
  
              egui::Frame::NONE
                  .fill(t.card)
+diff --git a/crates/ui-egui/src/theme.rs b/crates/ui-egui/src/theme.rs
+index 9f2bb90..56f658f 100644
+--- a/crates/ui-egui/src/theme.rs
++++ b/crates/ui-egui/src/theme.rs
+@@ -6,6 +6,15 @@ use std::sync::Arc;
+ use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
+ use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
+ 
++/// 宿主 shell 注入的额外 fallback 字体（键, 字节）；wasm 读不到系统字体。
++static EXTRA_FALLBACK_FONTS: std::sync::OnceLock<Vec<(String, std::sync::Arc<FontData>)>> = std::sync::OnceLock::new();
++pub fn set_extra_fallback_fonts(fonts: Vec<(String, std::sync::Arc<FontData>)>) {
++    let _ = EXTRA_FALLBACK_FONTS.set(fonts);
++}
++fn extra_fallback_fonts() -> &'static [(String, std::sync::Arc<FontData>)] {
++    EXTRA_FALLBACK_FONTS.get().map(|v| &v[..]).unwrap_or(&[])
++}
++
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+ pub enum ThemeKind {
+     #[default]
+@@ -363,6 +372,12 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
+         stack.extend(fallback.iter().cloned());
+         fonts.families.insert(FontFamily::Name(fam.into()), stack);
+     }
++    for (name, data) in extra_fallback_fonts() {
++        fonts.font_data.insert(name.clone(), data.clone());
++    }
++    for stack in fonts.families.values_mut() {
++        stack.extend(extra_fallback_fonts().iter().map(|(n, _)| n.clone()));
++    }
+     fonts
+ }
+ 
 diff --git a/crates/ui-egui/src/widgets.rs b/crates/ui-egui/src/widgets.rs
 index 4f5aaa7..9ccb7a0 100644
 --- a/crates/ui-egui/src/widgets.rs
