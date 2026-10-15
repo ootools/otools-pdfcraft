@@ -1,0 +1,89 @@
+diff --git a/crates/engine/src/commands.rs b/crates/engine/src/commands.rs
+index cf40386..5454b2f 100644
+--- a/crates/engine/src/commands.rs
++++ b/crates/engine/src/commands.rs
+@@ -362,7 +362,6 @@ pub const COMMANDS: &[CommandSpec] = &[
+     c("page.split", "Split document…", PAGES, None, Assembly, "scissors"),
+     c("page.number", "Number pages…", PAGES, None, Assembly, "hash"),
+     c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
+-    c("help.discord", "Join the ArtCraft Discord", HELP, None, Nothing, "messages-square"),
+     c("help.app_page", "PdfCraft web page", HELP, None, Nothing, "globe"),
+     c("help.github", "PdfCraft on GitHub", HELP, None, Nothing, "code-xml"),
+     c("help.website", "ArtCraft website", HELP, None, Nothing, "external-link"),
+diff --git a/crates/engine/src/links.rs b/crates/engine/src/links.rs
+index 5dd9aff..73c247c 100644
+--- a/crates/engine/src/links.rs
++++ b/crates/engine/src/links.rs
+@@ -22,9 +22,8 @@ pub struct Link {
+     pub icon: &'static str,
+ }
+ 
+-/// In the order they are shown. Discord comes first: it is where people get help fastest.
++/// In the order they are shown.
+ pub const LINKS: &[Link] = &[
+-    Link { command: "help.discord", label: "Join the ArtCraft Discord", url: DISCORD, icon: "messages-square" },
+     Link { command: "help.app_page", label: "PdfCraft web page", url: APP_PAGE, icon: "globe" },
+     Link { command: "help.github", label: "PdfCraft on GitHub", url: GITHUB, icon: "code-xml" },
+     Link { command: "help.website", label: "ArtCraft website", url: WEBSITE, icon: "external-link" },
+diff --git a/crates/ui-egui/src/chrome.rs b/crates/ui-egui/src/chrome.rs
+index 9617bf6..0774032 100644
+--- a/crates/ui-egui/src/chrome.rs
++++ b/crates/ui-egui/src/chrome.rs
+@@ -66,10 +66,8 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+                     app.active = None;
+                     app.combine_tab.focused = false;
+                 }
+-                // Keep the two icon buttons, Discord's text/padding and three gaps outside the scrolling tabs.
+-                let controls_width = ui.fonts_mut(|f| f.layout_no_wrap("Discord".into(), theme::medium(13.0), t.text).size().x)
+-                    + 2.0 * button
+-                    + 50.0
++                // Keep the icon buttons and window controls outside the scrolling tabs.
++                let controls_width = 2.0 * button
+                     + window_controls::width(&controls.right);
+                 // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
+                 let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
+@@ -289,10 +287,6 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+                     if icons::button(ui, "circle-help", button, false, tl!("Keyboard shortcuts")).clicked() {
+                         app.dialog = Some(Dialog::Shortcuts);
+                     }
+-                    // One click to the community, from anywhere in the app.
+-                    if widgets::ghost_button_sized(ui, "messages-square", "Discord", tab_h).on_hover_text(pdfcraft_engine::links::DISCORD).clicked() {
+-                        app.execute("help.discord");
+-                    }
+                 });
+             });
+         });
+diff --git a/crates/ui-egui/src/home.rs b/crates/ui-egui/src/home.rs
+index 3e70f34..71476da 100644
+--- a/crates/ui-egui/src/home.rs
++++ b/crates/ui-egui/src/home.rs
+@@ -40,7 +40,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+                         widgets::artcraft_mark(ui, 28.0);
+                         ui.vertical(|ui| {
+                             ui.label(egui::RichText::new(tl!("Join the ArtCraft community")).font(theme::semibold(15.0)));
+-                            ui.label(egui::RichText::new(tl!("Get help, share feedback and follow development on Discord.")).color(t.text_muted));
++                            ui.label(egui::RichText::new(tl!("Get help, share feedback and follow development.")).color(t.text_muted));
+                         });
+                     });
+                     ui.add_space(8.0);
+diff --git a/crates/ui-egui/src/widgets.rs b/crates/ui-egui/src/widgets.rs
+index 4f5aaa7..9ccb7a0 100644
+--- a/crates/ui-egui/src/widgets.rs
++++ b/crates/ui-egui/src/widgets.rs
+@@ -519,14 +519,14 @@ pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
+     )
+ }
+ 
+-/// Buttons for every community link (`pdfcraft_engine::links`), Discord first and prominent.
++/// Buttons for every community link (`pdfcraft_engine::links`); the first is shown prominent.
+ /// Returns the registry command of the one clicked.
+ pub fn community_links(ui: &mut egui::Ui) -> Option<&'static str> {
+     let mut clicked = None;
+     ui.horizontal_wrapped(|ui| {
+         ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+         for (i, l) in pdfcraft_engine::links::LINKS.iter().enumerate() {
+-            let resp = if i == 0 { icon_pill(ui, l.icon, tl!("Join our Discord"), true) } else { icon_pill(ui, l.icon, tl!(l.label), false) };
++            let resp = icon_pill(ui, l.icon, tl!(l.label), i == 0);
+             if resp.on_hover_text(l.url).clicked() {
+                 clicked = Some(l.command);
+             }
