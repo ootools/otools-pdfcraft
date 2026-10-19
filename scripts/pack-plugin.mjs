@@ -7,10 +7,13 @@
  * 扁平结构（plugin.json 在 ZIP 根）与「单一顶层目录」两种布局宿主都认，
  * 这里用扁平。
  *
- * 本插件是**纯前端**插件（没有 native cdylib），所以：
- *   - 不校验 lib/；
- *   - 用 `productionManifest` 去掉开发期配置（devUrl / quickDev），
- *     否则 OTools 的正式包校验会以「正式包不能启用开发模式」拒收。
+ * 本插件含 native 适配层（pdfcraft headless MCP）。`lib/` 若存在则一并打进包，
+ * 命名须符合宿主约定：lib/{macOS.dylib,Windows.dll,Linux.so}
+ * （宿主 native_plugins/core.rs 的 platform_lib_name()）。本地没构建 native 时
+ * `lib/` 不存在也不报错，方便只改前端时的联调。
+ *
+ * 用 `productionManifest` 去掉开发期配置（devUrl / quickDev），
+ * 否则 OTools 的正式包校验会以「正式包不能启用开发模式」拒收。
  *
  * 用法：node scripts/pack-plugin.mjs [--out dist-pack] [--version 0.6.2]
  */

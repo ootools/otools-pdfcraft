@@ -25,5 +25,30 @@
   "screenshots": [],
   "summary": "PdfCraft（开源、纯 Rust 重写的 Adobe Acrobat 式 PDF 工作台）的 OTools 插件版：阅读批注、合并拆分、重排加密、表单与签名。",
   "uuid": "otools-pdfcraft",
-  "version": "0.1.2"
+  "version": "0.1.3",
+  "native": {
+    "enabled": true
+  },
+  "mcp": {
+    "enabled": true,
+    "backend": "headless",
+    "namespace": "pdfcraft",
+    "expose": [
+      "doc_open",
+      "doc_info",
+      "doc_save",
+      "doc_close",
+      "page_render",
+      "text_extract",
+      "text_find",
+      "doc_combine",
+      "doc_split",
+      "edit_undo",
+      "command_list",
+      "command_run",
+      "command_batch",
+      "doc_inspect",
+      "render_preview"
+    ]
+  }
 }

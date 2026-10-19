@@ -22,3 +22,11 @@ Thumbs.db
 
 # playwright-cli 本地调试的临时输出
 .playwright-cli/
+
+# ---- native 适配层的构建产物 ----
+# 由 release 流水线产出并按宿主约定命名为 lib/{macOS.dylib,Windows.dll,Linux.so}，
+# 不进 git（与主仓 plugins/.gitignore 一致）。
+native/target/
+*.dylib
+*.dll
+*.so
