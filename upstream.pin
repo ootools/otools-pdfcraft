@@ -3,7 +3,7 @@
   "ssh": "git@github.com:storytold/pdfcraft.git",
   "https": "https://github.com/storytold/pdfcraft.git",
   "ref": "main",
-  "commit": "9931329b9fae0b05373b4dc3ac7c58541f0891a4",
+  "commit": "645016addcfb9078c557f0189559ab47cdcee057",
   "strategy": "shallow-fetch-pinned-commit",
   "note": "上游代码不入库。改这个 commit 并跑 node scripts/fetch-upstream.mjs 即可同步；务必用完整 SHA，保证可复现。"
 }

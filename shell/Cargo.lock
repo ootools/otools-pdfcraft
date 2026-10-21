@@ -1127,15 +1127,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-docpath"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63"
+
+[[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=f03ec27ab2c405969428512178f746183cd55ca0#f03ec27ab2c405969428512178f746183cd55ca0"
+source = "git+https://github.com/storytold/craft-libs?rev=666c358065261a2816b376fa3bb10538dbf53040#666c358065261a2816b376fa3bb10538dbf53040"
 dependencies = [
  "miniz_oxide 0.8.9",
  "roxmltree",
  "tempfile",
  "winprint",
  "winsafe",
+]
+
+[[package]]
+name = "craft-quit"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=f58bc1a3df490992d633393d0898af0588ce882c#f58bc1a3df490992d633393d0898af0588ce882c"
+dependencies = [
+ "dispatch2",
+ "egui",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
 ]
 
 [[package]]
@@ -2019,6 +2035,15 @@ checksum = "6c92d9081c7ab3bd83ef1eecdfad090f3d966e3ce74106779664114cfe1a6274"
 dependencies = [
  "bytemuck",
  "serde",
+]
+
+[[package]]
+name = "fontconfig-parser"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbc773e24e02d4ddd8395fd30dc147524273a83e54e0f312d986ea30de5f5646"
+dependencies = [
+ "roxmltree",
 ]
 
 [[package]]
@@ -3821,7 +3846,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-a11y"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -3833,7 +3858,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-annot"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-cos",
  "pdfcraft-fonts",
@@ -3843,7 +3868,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-audit"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -3854,18 +3879,18 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-compare"
-version = "0.8.0"
+version = "0.9.0"
 
 [[package]]
 name = "pdfcraft-content"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-cos",
 ]
 
 [[package]]
 name = "pdfcraft-cos"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-crypt",
  "pdfcraft-filters",
@@ -3874,7 +3899,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-create"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "encoding_rs",
  "image",
@@ -3889,7 +3914,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-crypt"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aes",
  "md-5",
@@ -3900,7 +3925,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-edit"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "kurbo 0.13.1",
  "pdfcraft-annot",
@@ -3914,9 +3939,10 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-engine"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "chrono",
+ "craft-docpath",
  "icu_properties",
  "idna",
  "image",
@@ -3946,19 +3972,20 @@ dependencies = [
  "pdfcraft-xfdf",
  "png 0.18.1",
  "thiserror 2.0.21",
+ "unicode-segmentation",
  "url",
 ]
 
 [[package]]
 name = "pdfcraft-export"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "flate2",
 ]
 
 [[package]]
 name = "pdfcraft-filters"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "flate2",
  "thiserror 2.0.21",
@@ -3966,7 +3993,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-fonts"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "harfrust",
  "pdfcraft-cos",
@@ -3976,7 +4003,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-forms"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -3987,18 +4014,18 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-geom"
-version = "0.8.0"
+version = "0.9.0"
 
 [[package]]
 name = "pdfcraft-js"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "boa_engine",
 ]
 
 [[package]]
 name = "pdfcraft-measure"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-content",
@@ -4010,14 +4037,14 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-model"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-cos",
 ]
 
 [[package]]
 name = "pdfcraft-ocr"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "ocrs",
  "pdfcraft-fonts",
@@ -4027,7 +4054,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-optimize"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "image",
  "pdfcraft-annot",
@@ -4039,7 +4066,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-organize"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -4048,24 +4075,26 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-platform"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-channel",
  "futures-lite",
+ "rustix 1.1.5",
  "zbus",
 ]
 
 [[package]]
 name = "pdfcraft-preflight"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
+ "pdfcraft-content",
  "pdfcraft-cos",
  "pdfcraft-model",
 ]
 
 [[package]]
 name = "pdfcraft-print"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "craft-print",
  "pdfcraft-content",
@@ -4076,7 +4105,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-redact"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-content",
@@ -4085,12 +4114,13 @@ dependencies = [
  "pdfcraft-fonts",
  "pdfcraft-forms",
  "pdfcraft-model",
+ "pdfcraft-xfa",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "pdfcraft-render"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "bytemuck",
  "getrandom 0.4.3",
@@ -4107,7 +4137,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-sign"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aes",
  "aws-lc-rs",
@@ -4141,15 +4171,17 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-ui-egui"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
  "bytemuck",
+ "craft-quit",
  "craft-ui",
  "eframe",
  "egui",
  "egui_extras",
+ "fontconfig-parser",
  "getrandom 0.4.3",
  "js-sys",
  "log",
@@ -4180,7 +4212,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-xfa"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "base64 0.22.1",
  "image",
@@ -4194,7 +4226,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-xfdf"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-cos",
