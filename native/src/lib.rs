@@ -37,7 +37,25 @@ fn dispatch(method: &str, payload: &Value) -> Result<Value, String> {
                 .unwrap_or_else(|| json!({}));
             Ok(mcp::call_payload(name, &arguments))
         }
+        // 上游 MCP 的 resources 能力。资源表是**动态**的（每打开一份文档多几条），
+        // 所以必须真问上游，不能写死。
+        "__otools_mcp_resources__" => mcp::resources_payload(),
+        "__otools_mcp_resource_templates__" => mcp::resource_templates_payload(),
+        "__otools_mcp_read_resource__" => {
+            let uri = payload
+                .get("uri")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if uri.trim().is_empty() {
+                return Err("缺少资源 uri".to_string());
+            }
+            mcp::read_resource_payload(uri)
+        }
         // 宿主热更新前的停机握手：释放常驻 headless 会话。
+        // 上游没有 prompts（预设工作流）能力，但协议要求问到就得答得上：
+        // 空表比 Unknown method 好——后者会让宿主每次建注册表都记一条错误日志。
+        "__otools_mcp_prompts__" => Ok(json!({ "prompts": [] })),
+        "__otools_mcp_get_prompt__" => Err("该插件不提供 prompt".to_string()),
         "__otools_shutdown__" => {
             mcp::shutdown_automation();
             Ok(json!({ "ok": true, "data": "otools-pdfcraft-native headless 会话已释放" }))

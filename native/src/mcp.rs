@@ -1,109 +1,110 @@
 //! 上游 `pdfcraft-automation` 与宿主 MCP 契约之间的薄适配（见宿主 spec §5.4）。
 //!
-//! 与 designcraft / vectorcraft 的差异（**不是照抄**）：
-//! - 工具表函数是 `tools()`，返回 `Vec<ToolDef>`（不是 `Vec<Value>`），
-//!   需要自行映射成 `{ name, title, description, inputSchema, annotations }`；
-//!   `ToolDef` 带原生 `read_only` / `destructive`，直接映射到 MCP 注解。
-//! - 执行入口是 `Automation::call(name, args) -> Result<Vec<Content>, ToolError>`，
-//!   结果要自己拼成 MCP 的 content / isError。
-//! - 上游有 163 个工具（spec §10.4 的关键约束）。
+//! **全部方法都走上游 `McpServer` 的分发**，包括 tools / resources / prompts：
+//! 上游 `McpServer::handle` 已经实现了 `tools/list`、`tools/call`、`resources/list`、
+//! `resources/templates/list`、`resources/read`，并且工具的注解（readOnlyHint /
+//! destructiveHint / idempotentHint / openWorldHint）也是它生成的。
+//! 适配层再手写一份映射，只会在上游改注解时悄悄过期。
 //!
-//! **有意不做按名字的 UI-only 过滤**：与另外两个 craft 插件同一条原则，
+//! 与 designcraft / vectorcraft 的差异：那两家的 `Server::new` 要求 `Box<dyn Backend>`，
+//! 而 `pdfcraft` 的 `McpServer::new(Automation)` 直接持有具体类型，所以这里可以直接把
+//! **整个 `McpServer`** 放进静态槽——连代理层都不需要。
+//!
+//! **有意不做按名字的 UI-only 过滤**：与另外几个 craft 插件同一条原则，
 //! 失败交回上游给出的可读错误（AI 能据此改参数）。
 
-use base64::Engine as _;
-use pdfcraft_automation::{tools, Automation, Content, ToolError};
+use pdfcraft_automation::mcp::McpServer;
+use pdfcraft_automation::Automation;
 use serde_json::{json, Value};
 
-/// 宿主 `__otools_mcp_tools__` 的响应体。
-pub fn tools_payload() -> Value {
-    let tools: Vec<Value> = tools()
-        .into_iter()
-        .map(|t| {
-            json!({
-                "name": t.name,
-                "title": t.title,
-                "description": t.description,
-                "inputSchema": t.input_schema,
-                "annotations": {
-                    "readOnlyHint": t.read_only,
-                    "destructiveHint": t.destructive,
-                }
-            })
-        })
-        .collect();
-    json!({ "tools": tools })
+/// 进程内**常驻**的上游 MCP 服务。
+///
+/// 上游 `McpServer` 持有 `Automation`（内含 Session），工具序列有状态
+/// （doc_open → doc_info → doc_save 依赖同一个 Session）。每次调用新建会让第二次
+/// 调用面对空会话，所以必须常驻；宿主热更新时走 `__otools_shutdown__` 重建。
+static SERVER: std::sync::OnceLock<std::sync::Mutex<McpServer>> = std::sync::OnceLock::new();
+
+fn server() -> &'static std::sync::Mutex<McpServer> {
+    SERVER.get_or_init(|| std::sync::Mutex::new(McpServer::new(Automation::new())))
 }
 
-/// 进程内**常驻**的 headless 会话。
+/// 走一次上游 MCP 分发，取 `result`。
 ///
-/// 上游 `Automation` 持有 Session，工具序列有状态（doc_open → doc_info → doc_save
-/// 依赖同一个 Session）。每次调用新建会让第二次调用面对空会话。
-static AUTOMATION: std::sync::OnceLock<std::sync::Mutex<Automation>> = std::sync::OnceLock::new();
+/// 错误码（`-32602` 参数错、`-32002` 资源不存在）由上游给出，这里只把 message
+/// 提出来交给宿主——resources 没有 `isError` 信封，必须变成 `Err`。
+fn rpc(method: &str, params: Value) -> Result<Value, String> {
+    let mut guard = server()
+        .lock()
+        .map_err(|_| "headless 会话状态已损坏，请重启 OTools".to_string())?;
+    let message = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": params,
+    });
+    let reply = guard
+        .handle(&message)
+        .ok_or_else(|| format!("上游对 {method} 没有应答"))?;
+    if let Some(error) = reply.get("error") {
+        let text = error
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("上游返回错误");
+        return Err(text.to_string());
+    }
+    reply
+        .get("result")
+        .cloned()
+        .ok_or_else(|| format!("{method} 的应答缺少 result"))
+}
 
-fn automation() -> &'static std::sync::Mutex<Automation> {
-    AUTOMATION.get_or_init(|| std::sync::Mutex::new(Automation::new()))
+/// 宿主 `__otools_mcp_tools__` 的响应体（163 个工具，注解由上游生成）。
+pub fn tools_payload() -> Value {
+    match rpc("tools/list", json!({})) {
+        Ok(value) => value,
+        Err(error) => json!({ "tools": [], "error": error }),
+    }
+}
+
+/// 宿主 `__otools_mcp_call__` 的响应体（`{content, isError, structuredContent?}`）。
+pub fn call_payload(name: &str, arguments: &Value) -> Value {
+    match rpc(
+        "tools/call",
+        json!({ "name": name, "arguments": arguments }),
+    ) {
+        Ok(value) => value,
+        Err(error) => json!({
+            "content": [{ "type": "text", "text": error }],
+            "isError": true
+        }),
+    }
+}
+
+/// 宿主 `__otools_mcp_resources__` 的响应体。
+///
+/// 上游的资源表是**动态**的：每打开一份文档就多一个 `pdfcraft://doc/{id}/…`
+/// 条目，所以必须真问上游，不能写死。
+pub fn resources_payload() -> Result<Value, String> {
+    rpc("resources/list", json!({}))
+}
+
+/// 宿主 `__otools_mcp_resource_templates__`（4 个模板：info / text / page text / page image）。
+pub fn resource_templates_payload() -> Result<Value, String> {
+    rpc("resources/templates/list", json!({}))
+}
+
+/// 宿主 `__otools_mcp_read_resource__`。
+pub fn read_resource_payload(uri: &str) -> Result<Value, String> {
+    rpc("resources/read", json!({ "uri": uri }))
 }
 
 /// 关掉会话（供宿主热更新前的停机握手调用）。
 pub fn shutdown_automation() {
-    if let Some(lock) = AUTOMATION.get() {
-        if let Ok(mut backend) = lock.lock() {
-            *backend = Automation::new();
+    if let Some(lock) = SERVER.get() {
+        if let Ok(mut guard) = lock.lock() {
+            *guard = McpServer::new(Automation::new());
         }
     }
-}
-
-/// 宿主 `__otools_mcp_call__` 的响应体。
-pub fn call_payload(name: &str, arguments: &Value) -> Value {
-    let mut guard = match automation().lock() {
-        Ok(guard) => guard,
-        Err(_) => {
-            return json!({
-                "content": [{ "type": "text", "text": "headless 会话状态已损坏，请重启 OTools" }],
-                "isError": true
-            })
-        }
-    };
-    match guard.call(name, arguments) {
-        Ok(content) => call_result(content),
-        Err(error) => error_result(&error),
-    }
-}
-
-/// `Vec<Content>` → MCP content 数组（与上游 `mcp.rs::call_result` 同形）。
-fn call_result(content: Vec<Content>) -> Value {
-    let mut structured = None;
-    let blocks: Vec<Value> = content
-        .into_iter()
-        .map(|c| match c {
-            Content::Json(v) => {
-                let text = serde_json::to_string_pretty(&v).unwrap_or_default();
-                if v.is_object() && structured.is_none() {
-                    structured = Some(v);
-                }
-                json!({ "type": "text", "text": text })
-            }
-            Content::Png { data, .. } => json!({
-                "type": "image",
-                "mimeType": "image/png",
-                "data": base64::engine::general_purpose::STANDARD.encode(data)
-            }),
-        })
-        .collect();
-    let mut result = json!({ "content": blocks, "isError": false });
-    if let Some(s) = structured {
-        result["structuredContent"] = s;
-    }
-    result
-}
-
-/// 工具错误 → `isError: true` 的可读结果（与上游一致，让 AI 能自行纠正）。
-fn error_result(error: &ToolError) -> Value {
-    json!({
-        "content": [{ "type": "text", "text": error.to_string() }],
-        "isError": true
-    })
 }
 
 #[cfg(test)]

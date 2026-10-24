@@ -23,10 +23,10 @@ crate-type = ["cdylib", "rlib"]
 name = "otools_pdfcraft_native"
 
 [dependencies]
-pdfcraft-automation = { path = "../upstream/crates/automation", default-features = false }
+# `mcp` feature 必须开：适配层现在整体走上游 `McpServer` 的分发（tools / resources
+# 都在里面）。关掉它就只能退回手写映射，资源表也就没了。
+pdfcraft-automation = { path = "../upstream/crates/automation", default-features = false, features = ["mcp"] }
 serde_json = "1"
-# Content::Png 要按 MCP 约定编成 base64（上游 mcp 模块同样用 base64）。
-base64 = "0.22"
 
 # 上游 workspace 里的 `[patch.crates-io]` **不会**跟着 path 依赖带过来：
 # 补丁只在发起构建的那个 workspace 根节点生效。少了这一段，hayro / lopdf /
