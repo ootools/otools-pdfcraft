@@ -49,18 +49,21 @@ features = [
   "Window",
 ]
 
-# 上游 workspace 里的 `[patch.crates-io]` **不会**跟着 path 依赖带过来：
+# 上游 workspace 里的 `# 上游 workspace 里的 `[patch.crates-io]` **不会**跟着 path 依赖带过来：
 # 补丁只在发起构建的那个 workspace 根节点生效。少了这一段，hayro / lopdf /
-# egui-wgpu 会退到 crates.io 的未打补丁版本（上游 vendor/ 里是改过的）。
+# egui-wgpu / vello_common 会退到 crates.io 的未打补丁版本（上游 vendor/ 里是改过的）。
 # 上游更新后要同步这里 —— 见 AGENTS.md。
 [patch.crates-io]
-hayro = { path = "../upstream/vendor/hayro" }
 hayro-interpret = { path = "../upstream/vendor/hayro-interpret" }
+hayro = { path = "../upstream/vendor/hayro" }
 hayro-syntax = { path = "../upstream/vendor/hayro-syntax" }
+hayro-cmap = { path = "../upstream/vendor/hayro-cmap" }
+hayro-postscript = { path = "../upstream/vendor/hayro-postscript" }
 hayro-jbig2 = { path = "../upstream/vendor/hayro-jbig2" }
 lopdf = { path = "../upstream/vendor/lopdf" }
 winit = { path = "../upstream/vendor/winit" }
 egui-wgpu = { path = "../upstream/vendor/egui-wgpu" }
+vello_common = { path = "../upstream/vendor/vello_common" }
 
 [profile.release]
 opt-level = 3

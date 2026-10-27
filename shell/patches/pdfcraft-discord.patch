@@ -1,8 +1,8 @@
 diff --git a/crates/engine/src/commands.rs b/crates/engine/src/commands.rs
-index cf40386..5454b2f 100644
+index 4ebfeca..a769e7d 100644
 --- a/crates/engine/src/commands.rs
 +++ b/crates/engine/src/commands.rs
-@@ -362,7 +362,6 @@ pub const COMMANDS: &[CommandSpec] = &[
+@@ -377,7 +377,6 @@ pub const COMMANDS: &[CommandSpec] = &[
      c("page.split", "Split document…", PAGES, None, Assembly, "scissors"),
      c("page.number", "Number pages…", PAGES, None, Assembly, "hash"),
      c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
@@ -11,7 +11,7 @@ index cf40386..5454b2f 100644
      c("help.github", "PdfCraft on GitHub", HELP, None, Nothing, "code-xml"),
      c("help.website", "ArtCraft website", HELP, None, Nothing, "external-link"),
 diff --git a/crates/engine/src/links.rs b/crates/engine/src/links.rs
-index 5dd9aff..73c247c 100644
+index 9b1c497..803a736 100644
 --- a/crates/engine/src/links.rs
 +++ b/crates/engine/src/links.rs
 @@ -22,9 +22,8 @@ pub struct Link {
@@ -26,7 +26,7 @@ index 5dd9aff..73c247c 100644
      Link { command: "help.github", label: "PdfCraft on GitHub", url: GITHUB, icon: "code-xml" },
      Link { command: "help.website", label: "ArtCraft website", url: WEBSITE, icon: "external-link" },
 diff --git a/crates/ui-egui/src/chrome.rs b/crates/ui-egui/src/chrome.rs
-index 9617bf6..0774032 100644
+index 2723d16..5b58236 100644
 --- a/crates/ui-egui/src/chrome.rs
 +++ b/crates/ui-egui/src/chrome.rs
 @@ -66,10 +66,8 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
@@ -42,7 +42,7 @@ index 9617bf6..0774032 100644
                      + window_controls::width(&controls.right);
                  // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
                  let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
-@@ -289,10 +287,6 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+@@ -299,10 +297,6 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                      if icons::button(ui, "circle-help", button, false, tl!("Keyboard shortcuts")).clicked() {
                          app.dialog = Some(Dialog::Shortcuts);
                      }
@@ -54,38 +54,47 @@ index 9617bf6..0774032 100644
              });
          });
 diff --git a/crates/ui-egui/src/home.rs b/crates/ui-egui/src/home.rs
-index 3e70f34..07439d1 100644
+index 59b0a52..b3d3e23 100644
 --- a/crates/ui-egui/src/home.rs
 +++ b/crates/ui-egui/src/home.rs
-@@ -29,26 +29,6 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+@@ -29,35 +29,6 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                      .font(theme::regular(14.0)),
              );
              ui.add_space(14.0);
--            egui::Frame::NONE
--                .fill(t.card)
--                .stroke(Stroke::new(1.0, t.border))
--                .corner_radius(CornerRadius::same(12))
--                .inner_margin(egui::Margin::same(14))
--                .show(ui, |ui| {
--                    ui.set_width(ui.available_width());
--                    ui.horizontal(|ui| {
--                        widgets::artcraft_mark(ui, 28.0);
--                        ui.vertical(|ui| {
--                            ui.label(egui::RichText::new(tl!("Join the ArtCraft community")).font(theme::semibold(15.0)));
--                            ui.label(egui::RichText::new(tl!("Get help, share feedback and follow development on Discord.")).color(t.text_muted));
+-            if !app.community_card_closed {
+-                egui::Frame::NONE
+-                    .fill(t.card)
+-                    .stroke(Stroke::new(1.0, t.border))
+-                    .corner_radius(CornerRadius::same(12))
+-                    .inner_margin(egui::Margin::same(14))
+-                    .show(ui, |ui| {
+-                        ui.set_width(ui.available_width());
+-                        ui.horizontal(|ui| {
+-                            widgets::artcraft_mark(ui, 28.0);
+-                            ui.vertical(|ui| {
+-                                ui.label(egui::RichText::new(tl!("Join the ArtCraft community")).font(theme::semibold(15.0)));
+-                                ui.label(egui::RichText::new(tl!("Get help, share feedback and follow development on Discord.")).color(t.text_muted));
+-                            });
+-                            // Closed for this run only: the card is back on the next launch.
+-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+-                                if icons::button(ui, "x", 24.0, false, tl!("Close")).clicked() {
+-                                    app.community_card_closed = true;
+-                                }
+-                            });
 -                        });
+-                        ui.add_space(8.0);
+-                        if let Some(cmd) = widgets::community_links(ui) {
+-                            app.execute(cmd);
+-                        }
 -                    });
--                    ui.add_space(8.0);
--                    if let Some(cmd) = widgets::community_links(ui) {
--                        app.execute(cmd);
--                    }
--                });
--            ui.add_space(22.0);
- 
+-                ui.add_space(22.0);
+-            }
+-
              egui::Frame::NONE
                  .fill(t.card)
+                 .stroke(Stroke::new(1.0, t.border))
 diff --git a/crates/ui-egui/src/theme.rs b/crates/ui-egui/src/theme.rs
-index 9f2bb90..56f658f 100644
+index 442cd6d..bdd8be0 100644
 --- a/crates/ui-egui/src/theme.rs
 +++ b/crates/ui-egui/src/theme.rs
 @@ -6,6 +6,15 @@ use std::sync::Arc;
@@ -104,7 +113,7 @@ index 9f2bb90..56f658f 100644
  #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
  pub enum ThemeKind {
      #[default]
-@@ -363,6 +372,12 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
+@@ -416,6 +425,12 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
          stack.extend(fallback.iter().cloned());
          fonts.families.insert(FontFamily::Name(fam.into()), stack);
      }
@@ -118,10 +127,10 @@ index 9f2bb90..56f658f 100644
  }
  
 diff --git a/crates/ui-egui/src/widgets.rs b/crates/ui-egui/src/widgets.rs
-index 4f5aaa7..9ccb7a0 100644
+index 2d1f639..1298433 100644
 --- a/crates/ui-egui/src/widgets.rs
 +++ b/crates/ui-egui/src/widgets.rs
-@@ -519,14 +519,14 @@ pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
+@@ -531,14 +531,14 @@ pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
      )
  }
  
