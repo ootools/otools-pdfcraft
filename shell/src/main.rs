@@ -56,6 +56,13 @@ mod web {
                 }
             }
             self.app.logic(ctx, frame);
+            // 宿主投递的「打开方式」：系统里双击已绑定扩展名的 PDF → 用本插件打开。
+            // 字节由 JS 侧读好（`otools::drain_delivered`），这里只负责交给上游。
+            for file in crate::otools::drain_delivered() {
+                if let Err(error) = self.app.open_bytes(&file.name, file.path, file.bytes) {
+                    log::warn!("could not open delivered {}: {error}", file.name);
+                }
+            }
             // 让插件更纯粹：吞掉所有社区/外部链接（Discord、ArtCraft 官网、上游 GitHub），
             // 点击不再跳出插件。文档内普通链接不受影响。
             ctx.output_mut(|o| {
@@ -119,6 +126,8 @@ mod web {
                 .await;
             // 监听宿主语言切换（OTools 注入的 `otools-locale-changed` 事件）。
             install_locale_listener();
+            // 宿主投递了文件：把 egui 从空闲里叫醒，下一帧 `logic` 取件。
+            install_deliver_listener();
             if let Some(el) = document.get_element_by_id(LOADING_ID) {
                 match result {
                     Ok(()) => el.remove(),
@@ -140,6 +149,22 @@ mod web {
         }) as Box<dyn FnMut()>);
         let _ = window.add_event_listener_with_callback(
             "otools-locale-changed",
+            closure.as_ref().unchecked_ref::<js_sys::Function>(),
+        );
+        closure.forget();
+    }
+
+    /// 监听宿主投递（`shell/index.html` 读完字节后派发的 `otools-open-files-arrived`）：
+    /// egui 空闲时不会跑帧，这里把上下文叫醒，让 `WebShell::logic` 去取件。
+    fn install_deliver_listener() {
+        let Some(window) = web_sys::window() else { return };
+        let closure = Closure::wrap(Box::new(|| {
+            if let Some(ctx) = APP_CTX.with(|c| c.borrow().clone()) {
+                ctx.request_repaint();
+            }
+        }) as Box<dyn FnMut()>);
+        let _ = window.add_event_listener_with_callback(
+            "otools-open-files-arrived",
             closure.as_ref().unchecked_ref::<js_sys::Function>(),
         );
         closure.forget();

@@ -37,6 +37,46 @@ extern "C" {
     /// `{name, dataBase64, forcePick}` → `{path}` 或 `null`（用户取消）。
     #[wasm_bindgen(js_namespace = pdfcraftOtools, js_name = "saveFile")]
     fn host_save_file(request: JsValue) -> js_sys::Promise;
+
+    /// 宿主投递的「打开方式」：JS 侧已把文件读成字节攒好，这里一次取走。
+    /// 元素形如 `{path, name, dataBase64}`（见 `shell/index.html` 的投递段）。
+    #[wasm_bindgen(js_namespace = pdfcraftOtools, js_name = "takeDelivered")]
+    fn take_delivered_raw() -> js_sys::Array;
+}
+
+/// 宿主投递来的一份文件（JS 侧已读成字节）。
+pub struct Delivered {
+    pub name: String,
+    /// 真实落盘路径：给了它，「保存」才会写回原文件而不是弹另存对话框。
+    pub path: Option<String>,
+    pub bytes: Vec<u8>,
+}
+
+/// 取走宿主投递的文件（每帧调一次，取空即无事）。
+///
+/// 与保存相反的方向：宿主在系统里双击已绑定扩展名的文件 → 投递队列 → 本函数取走 →
+/// 上游 `PdfCraftApp::open_bytes`。上游网页版的「打开」是 rfd（`<input type=file>`），
+/// 外壳换不掉，但打开**字节**的入口是公开的，所以这条路不需要改上游。
+pub fn drain_delivered() -> Vec<Delivered> {
+    let raw = take_delivered_raw();
+    let mut out = Vec::new();
+    for item in raw.iter() {
+        if !item.is_object() {
+            continue;
+        }
+        let name = field(&item, "name").unwrap_or_default();
+        if name.trim().is_empty() {
+            continue;
+        }
+        let path = field(&item, "path").filter(|p| !p.trim().is_empty());
+        let encoded = field(&item, "dataBase64").unwrap_or_default();
+        let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(encoded) else {
+            log::warn!("delivered file {name} is not valid base64");
+            continue;
+        };
+        out.push(Delivered { name, path, bytes });
+    }
+    out
 }
 
 thread_local! {

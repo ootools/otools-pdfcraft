@@ -4,6 +4,9 @@
   "displayName": "PdfCraft",
   "displayNameCN": "PDFCraft",
   "entry": "dist/index.html",
+  "fileAssociations": [
+    { "ext": "pdf", "desc": "PDF 文档", "mime": "application/pdf" }
+  ],
   "quickDev": true,
   "hasAd": false,
   "icon": "📕",
