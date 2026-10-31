@@ -758,18 +758,28 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63"
+source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
 
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=666c358065261a2816b376fa3bb10538dbf53040#666c358065261a2816b376fa3bb10538dbf53040"
+source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
 dependencies = [
- "miniz_oxide 0.8.9",
+ "craft-winprint-gdi",
+ "log",
+ "miniz_oxide 0.9.1",
  "roxmltree",
  "tempfile",
  "winprint",
  "winsafe",
+]
+
+[[package]]
+name = "craft-winprint-gdi"
+version = "0.1.0"
+source = "git+https://github.com/storytold/winprint.rs?rev=417ac3c4d14d3da5485a99c7d5ce8f05664ec312#417ac3c4d14d3da5485a99c7d5ce8f05664ec312"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1643,6 +1653,7 @@ version = "0.3.0"
 dependencies = [
  "fearless_simd",
  "hayro-ccitt",
+ "image",
 ]
 
 [[package]]
@@ -2463,7 +2474,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-a11y"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -2475,7 +2486,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-annot"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-cos",
  "pdfcraft-fonts",
@@ -2485,7 +2496,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-audit"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -2496,9 +2507,9 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-automation"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "pdfcraft-cos",
  "pdfcraft-engine",
  "pdfcraft-organize",
@@ -2511,11 +2522,11 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-compare"
-version = "0.14.0"
+version = "0.16.1"
 
 [[package]]
 name = "pdfcraft-content"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "hayro-syntax",
  "pdfcraft-cos",
@@ -2523,7 +2534,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-cos"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "chrono",
  "pdfcraft-crypt",
@@ -2533,13 +2544,16 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-create"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "encoding_rs",
+ "hayro-jbig2",
  "image",
  "pdfcraft-cos",
+ "pdfcraft-filters",
  "pdfcraft-fonts",
  "pdfcraft-model",
+ "pdfcraft-xfa",
  "png",
  "thiserror",
  "tiff",
@@ -2548,7 +2562,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-crypt"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "aes",
  "md-5",
@@ -2559,7 +2573,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-edit"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "kurbo",
  "pdfcraft-annot",
@@ -2567,16 +2581,18 @@ dependencies = [
  "pdfcraft-cos",
  "pdfcraft-fonts",
  "pdfcraft-model",
+ "sha2 0.11.1",
  "thiserror",
  "unicode-bidi",
 ]
 
 [[package]]
 name = "pdfcraft-engine"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "chrono",
  "craft-docpath",
+ "getrandom 0.4.3",
  "icu_properties",
  "idna",
  "image",
@@ -2613,22 +2629,24 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-export"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "flate2",
 ]
 
 [[package]]
 name = "pdfcraft-filters"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
+ "fax",
  "flate2",
+ "hayro-ccitt",
  "thiserror",
 ]
 
 [[package]]
 name = "pdfcraft-fonts"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "harfrust",
  "pdfcraft-cos",
@@ -2638,7 +2656,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-forms"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -2649,11 +2667,11 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-geom"
-version = "0.14.0"
+version = "0.16.1"
 
 [[package]]
 name = "pdfcraft-js"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "boa_engine",
  "chrono",
@@ -2661,7 +2679,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-measure"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-content",
@@ -2673,14 +2691,14 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-model"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-cos",
 ]
 
 [[package]]
 name = "pdfcraft-ocr"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "ocrs",
  "pdfcraft-fonts",
@@ -2690,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-optimize"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "image",
  "pdfcraft-annot",
@@ -2704,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-organize"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -2713,7 +2731,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-platform"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "async-channel",
  "futures-lite",
@@ -2723,7 +2741,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-preflight"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
@@ -2733,7 +2751,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-print"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "craft-print",
  "pdfcraft-content",
@@ -2744,7 +2762,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-redact"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-content",
@@ -2759,7 +2777,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-render"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "bytemuck",
  "getrandom 0.4.3",
@@ -2771,16 +2789,17 @@ dependencies = [
  "pdfcraft-cos",
  "pdfcraft-fonts",
  "serde",
+ "skrifa 0.44.0",
  "thiserror",
 ]
 
 [[package]]
 name = "pdfcraft-sign"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "aes",
  "aws-lc-rs",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bp256",
  "bp384",
  "cbc",
@@ -2812,9 +2831,9 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-xfa"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "image",
  "pdfcraft-cos",
  "pdfcraft-fonts",
@@ -2826,7 +2845,7 @@ dependencies = [
 
 [[package]]
 name = "pdfcraft-xfdf"
-version = "0.14.0"
+version = "0.16.1"
 dependencies = [
  "pdfcraft-annot",
  "pdfcraft-cos",
@@ -3445,9 +3464,12 @@ dependencies = [
 
 [[package]]
 name = "roxmltree"
-version = "0.20.0"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
+checksum = "9da7f59328b09405b181fee1018925fad50f157afb43c0c0f5c522c256dd5907"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "rsa"
@@ -3478,6 +3500,7 @@ dependencies = [
  "rten-base",
  "rten-gemm",
  "rten-model-file",
+ "rten-onnx",
  "rten-parallel",
  "rten-shape-inference",
  "rten-simd",
@@ -3526,6 +3549,12 @@ dependencies = [
  "flatbuffers",
  "rten-base",
 ]
+
+[[package]]
+name = "rten-onnx"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96944374568990b8d1bbc5bae5957585866f9dd8256130460405730948bfd42e"
 
 [[package]]
 name = "rten-parallel"
@@ -4784,8 +4813,6 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d8ded630e8316bb94a55881256506d1f3b9947b5f66db8a7d32ca7ba02decd0"
 dependencies = [
  "bytemuck",
  "glifo",
@@ -5491,9 +5518,76 @@ dependencies = [
 ]
 
 [[patch.unused]]
+name = "ecolor"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "eframe"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
 name = "egui-wgpu"
-version = "0.36.2"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui-winit"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_demo_lib"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_extras"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_glow"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_inspection"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_kittest"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "egui_system_font_provider"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "emath"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "epaint"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
+
+[[patch.unused]]
+name = "epaint_default_fonts"
+version = "0.37.0"
+source = "git+https://github.com/storytold/egui.git?rev=6d518fc799681571963842f95b55a6b68431b15a#6d518fc799681571963842f95b55a6b68431b15a"
 
 [[patch.unused]]
 name = "winit"
 version = "0.30.13"
+source = "git+https://github.com/storytold/winit.git?rev=a517b3846ee8457d84ee4975110bfda6797c44dc#a517b3846ee8457d84ee4975110bfda6797c44dc"
