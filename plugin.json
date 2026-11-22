@@ -57,5 +57,6 @@
       "pdfcraft://document",
       "pdfcraft://commands"
     ]
-  }
+  },
+  "openSourceUrl": "https://github.com/ootools/otools-pdfcraft"
 }
