@@ -1,9 +1,9 @@
 diff --git a/crates/engine/src/commands.rs b/crates/engine/src/commands.rs
-index 6bfe9fa..d9c9062 100644
+index eae8a53..8f5661a 100644
 --- a/crates/engine/src/commands.rs
 +++ b/crates/engine/src/commands.rs
-@@ -396,7 +396,6 @@ pub const COMMANDS: &[CommandSpec] = &[
-     c("page.number", "Number pages…", PAGES, None, Assembly, "hash"),
+@@ -436,7 +436,6 @@ pub const COMMANDS: &[CommandSpec] = &[
+     c("prepress.hairlines", "Fix hairlines…", None, None, Modification, "minus"),
      c("page.properties", "Page properties…", PAGES, None, Modification, "info"),
      c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
 -    c("help.discord", "Join the ArtCraft Discord", HELP, None, Nothing, "messages-square"),
@@ -11,7 +11,7 @@ index 6bfe9fa..d9c9062 100644
      c("help.github", "PdfCraft on GitHub", HELP, None, Nothing, "code-xml"),
      c("help.website", "ArtCraft website", HELP, None, Nothing, "external-link"),
 diff --git a/crates/engine/src/links.rs b/crates/engine/src/links.rs
-index e1d54d5..a1ebad0 100644
+index da3f0fc..b619b3f 100644
 --- a/crates/engine/src/links.rs
 +++ b/crates/engine/src/links.rs
 @@ -22,9 +22,8 @@ pub struct Link {
@@ -26,10 +26,10 @@ index e1d54d5..a1ebad0 100644
      Link { command: "help.github", label: "PdfCraft on GitHub", url: GITHUB, icon: "code-xml" },
      Link { command: "help.website", label: "ArtCraft website", url: WEBSITE, icon: "external-link" },
 diff --git a/crates/ui-egui/src/chrome.rs b/crates/ui-egui/src/chrome.rs
-index aa6233c..176440e 100644
+index 689c847..c945b21 100644
 --- a/crates/ui-egui/src/chrome.rs
 +++ b/crates/ui-egui/src/chrome.rs
-@@ -69,10 +69,8 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+@@ -108,10 +108,8 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                      app.active = None;
                      app.combine_tab.focused = false;
                  }
@@ -42,7 +42,7 @@ index aa6233c..176440e 100644
                      + window_controls::width(&controls.right);
                  // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
                  let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
-@@ -309,10 +307,6 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+@@ -326,10 +324,6 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                      if icons::button(ui, "circle-help", button, false, tl!("Keyboard shortcuts")).clicked() {
                          app.dialog = Some(Dialog::Shortcuts);
                      }
@@ -54,10 +54,10 @@ index aa6233c..176440e 100644
              });
          });
 diff --git a/crates/ui-egui/src/home.rs b/crates/ui-egui/src/home.rs
-index 390b059..0b4eb06 100644
+index 817655b..e3326c1 100644
 --- a/crates/ui-egui/src/home.rs
 +++ b/crates/ui-egui/src/home.rs
-@@ -32,35 +32,6 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+@@ -83,35 +83,6 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                      .font(theme::regular(14.0)),
              );
              ui.add_space(14.0);
@@ -127,10 +127,10 @@ index c3ce3e0..bec3b63 100644
  }
  
 diff --git a/crates/ui-egui/src/widgets.rs b/crates/ui-egui/src/widgets.rs
-index 1c688b9..1f705a4 100644
+index 80be26e..c833ebf 100644
 --- a/crates/ui-egui/src/widgets.rs
 +++ b/crates/ui-egui/src/widgets.rs
-@@ -605,14 +605,14 @@ pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
+@@ -711,14 +711,14 @@ pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
      )
  }
  
