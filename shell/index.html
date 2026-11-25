@@ -268,7 +268,7 @@
           if (!hostReady()) return fail('OTools 保存对话框不可用');
 
           var map = loadMap();
-          var known = map[name];
+          var known = (typeof req.path === 'string' && req.path) || map[name];
           if (!req.forcePick && known) {
             return writeHostFile(known, req.dataBase64).then(function () {
               diag({ lastSave: known, lastSaveMode: 'overwrite' });

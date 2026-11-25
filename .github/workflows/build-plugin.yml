@@ -31,6 +31,12 @@ jobs:
           rustup default stable
           rustup target add wasm32-unknown-unknown
 
+      - name: 校验宿主对话框请求队列
+        run: |
+          rustc --edition 2024 --test shell/src/requests.rs -o /tmp/host-request-tests
+          /tmp/host-request-tests
+          node --test scripts/*.test.mjs
+
       - name: 安装 trunk
         run: cargo install trunk --locked
 

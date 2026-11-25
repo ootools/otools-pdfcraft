@@ -93,3 +93,11 @@
 - 不要给 `upstream/` 里的 crate 打 patch、加 `cfg`、写 TODO。
 - 不要在本仓库跑 `cargo build` 而不管 target：外壳是 wasm-only 的，
   宿主（x86_64）下 `main()` 只会打印一行提示，别把它当编译报错。
+
+## 2026-11-25 craft 运行时迁移
+
+- 当前上游 0.22 使用 `PdfCraftApp::with_host` + `AppServices`；先安装 `craft::ui::shell::embed`，再创建应用和连接 settings store。
+- 旧 `host_save` / `FailedInbox` 已移除；`shell/src/otools.rs::HostFiles` 实现 `craft::host::Files`，打开沿用 BrowserFiles，保存走宿主 Promise，完成后答复 Paths/Cancelled/Failed。
+- `shell/src/requests.rs` 管理异步请求，取消后迟到结果丢弃；独立 `rustc --test` 用例在 CI 执行。
+- UI 字体补丁迁到 `fonts.rs`，通过 EmbeddedFace 注册中文和阿拉伯脚本 fallback，避免覆盖默认拉丁主字体；社区入口补丁已按新组件结构重做。
+- 上游 `[patch.crates-io]` 中 vendor 相对路径必须在 shell/native 改成 `../upstream/vendor/...`。

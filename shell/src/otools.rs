@@ -1,22 +1,13 @@
-//! OTools 宿主桥：把「文件存到哪去」换成 OTools 宿主的另存对话框与磁盘写入。
-//!
-//! 上游 `apps/pdfcraft-web` 在浏览器里没有文件系统：保存走浏览器下载。OTools 宿主注入的
-//! `window.otools` 提供了真正的另存对话框与 `writeHostFile`（底层是宿主的
-//! `tools_webview_pick_save_path` / `tools_webview_write_file`，无路径白名单限制），
-//! 所以本模块是插件**唯一**需要新写的 Rust 代码：其余全部复用上游 crate。
-//!
-//! 与上游的对接点只有一个，就在上游设计好的钩子上，上游源码零改动：
-//! - `PdfCraftApp::host_save` —— 保存时把字节交给宿主写盘
-//!
-//! 打开仍然是上游的 rfd（浏览器里它用 `<input type=file>`），因为我们没有 UI 层的
-//! 钩子可以把「打开」菜单换掉；见 AGENTS.md 的「已知限制」。
-//!
-//! JS 侧的实现见 `shell/index.html` 里的 `window.pdfcraftOtools`。
+//! OTools 文件服务：打开走 BrowserFiles，保存与另存通过宿主对话框和写盘 Promise。
+//! 框架通过票号轮询 Paths/Cancelled/Failed；同步 write 路径异步提交并在界面报告失败。
+//! JS 桥位于 shell/index.html 的 window.pdfcraftOtools。
 
 use std::cell::RefCell;
 
 use base64::Engine as _;
-use pdfcraft_ui_egui::FailedInbox;
+use craft::host::{Files, FileError, PickId, Picked, PickRequest, WriteIntent};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys;
@@ -80,8 +71,8 @@ pub fn drain_delivered() -> Vec<Delivered> {
 }
 
 thread_local! {
-    /// 保存失败时把错误送到应用的 failed_inbox（上游会显示在界面上）。
-    static OUTBOX: RefCell<Option<(FailedInbox, egui::Context)>> = const { RefCell::new(None) };
+    /// 同步 write 提交后的异步错误通过 UI notice 显示。
+    static OUTBOX: RefCell<Option<egui::Context>> = const { RefCell::new(None) };
 }
 
 /// 宿主是否可用（不在 OTools 里时退回上游的浏览器行为：下载文件）。
@@ -105,32 +96,35 @@ pub fn is_community_url(url: &str) -> bool {
     url.contains("discord.gg") || url.contains("getartcraft.com") || url.contains("github.com/storytold")
 }
 
-/// 记住 failed_inbox 与 egui 上下文：异步保存的失败要在下一帧报给应用。
-pub fn install(failed: FailedInbox, ctx: egui::Context) {
-    OUTBOX.with(|slot| *slot.borrow_mut() = Some((failed, ctx)));
+/// 记住 UI 上下文，异步写盘失败时显示 notice。
+pub fn install(ctx: egui::Context) {
+    OUTBOX.with(|slot| *slot.borrow_mut() = Some(ctx));
 }
 
 fn report(name: &str, message: String) {
     OUTBOX.with(|slot| {
-        if let Some((failed, ctx)) = slot.borrow().as_ref() {
-            if let Ok(mut q) = failed.lock() {
-                q.push((name.to_string(), message));
-            }
+        if let Some(ctx) = slot.borrow().as_ref() {
+            let _ = craft::ui::notices::NoticeCenter::new().post(
+                ctx, &craft::ui::notices::PostedNotice::new(format!("{name}: {message}")), &[],
+            );
             ctx.request_repaint();
         }
     });
 }
 
-/// `PdfCraftApp::host_save`：把保存出的字节交给宿主写盘。
+/// Files::write 的宿主实现：把保存出的字节交给宿主写盘。
 ///
 /// 上游的钩子是同步的 `fn`，而宿主的对话框是 Promise，所以这里发起一次后台任务并
 /// 立刻返回 `Ok`（与上游网页版「下载已开始即算已保存」的语义一致）。写盘失败会
-/// 通过 failed_inbox 报在界面上。
+/// 通过 UI notice 报在界面上。
 pub fn deliver(name: &str, bytes: &[u8], save_as: bool) -> Result<(), String> {
     if name.trim().is_empty() {
         return Err("需要一个文件名".into());
     }
     let request = save_request(name, &base64::engine::general_purpose::STANDARD.encode(bytes), save_as);
+    if !save_as && (name.starts_with('/') || name.starts_with('\\') || name.as_bytes().get(1) == Some(&b':')) {
+        let _ = js_sys::Reflect::set(&request, &JsValue::from_str("path"), &JsValue::from_str(name));
+    }
     let name = name.to_string();
     wasm_bindgen_futures::spawn_local(async move {
         match save_file(&request).await {
@@ -166,4 +160,63 @@ fn field(value: &JsValue, key: &str) -> Option<String> {
 
 fn js_error(e: JsValue) -> String {
     e.as_string().unwrap_or_else(|| format!("{e:?}"))
+}
+
+/// Browser picking plus OTools asynchronous saves over the framework Files interface.
+pub struct HostFiles {
+    browser: craft::platform::browser_files::BrowserFiles,
+    saves: Arc<Mutex<crate::requests::Requests<PickRequest, Picked>>>,
+    ctx: egui::Context,
+}
+
+impl HostFiles {
+    pub fn new(ctx: egui::Context) -> Self {
+        let wake = ctx.clone();
+        let browser = craft::platform::browser_files::BrowserFiles::new(move || wake.request_repaint())
+            .page_saves(|name, bytes, save_as| available().then(|| deliver(name, bytes, save_as)));
+        Self { browser, saves: Arc::default(), ctx }
+    }
+}
+
+impl Files for HostFiles {
+    fn pick(&self, request: PickRequest) -> PickId { self.browser.pick(request) }
+    fn take_answer(&self, id: PickId) -> Option<Picked> {
+        if id.0 & (1 << 63) == 0 { return self.browser.take_answer(id); }
+        self.saves.lock().unwrap_or_else(|e| e.into_inner()).take_answer(id.0)
+    }
+    fn forget(&self, id: PickId) {
+        if id.0 & (1 << 63) == 0 { self.browser.forget(id); }
+        else { self.saves.lock().unwrap_or_else(|e| e.into_inner()).forget(id.0); }
+    }
+    fn pick_pending(&self) -> bool {
+        self.browser.pick_pending() || self.saves.lock().unwrap_or_else(|e| e.into_inner()).pending().is_some()
+    }
+    fn read(&self, path: &Path) -> Result<Vec<u8>, FileError> { self.browser.read(path) }
+    fn write(&self, path: &Path, bytes: &[u8], intent: WriteIntent) -> Result<bool, FileError> {
+        if available() {
+            deliver(&path.to_string_lossy(), bytes, matches!(intent, WriteIntent::SaveAs))
+                .map(|_| true).map_err(FileError::Other)
+        } else { self.browser.write(path, bytes, intent) }
+    }
+    fn last_folder(&self, purpose: &str) -> Option<PathBuf> { self.browser.last_folder(purpose) }
+    fn save(&self, request: PickRequest, bytes: Vec<u8>) -> PickId {
+        if !available() { return self.browser.save(request, bytes); }
+        let id = PickId(self.saves.lock().unwrap_or_else(|e| e.into_inner()).issue(request.clone()));
+        let name = request.file_name.as_deref().unwrap_or("document.pdf");
+        let request = save_request(name, &base64::engine::general_purpose::STANDARD.encode(bytes), true);
+        let state = self.saves.clone();
+        let ctx = self.ctx.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let picked = match save_file(&request).await {
+                Ok(Some(path)) => Picked::Paths(vec![PathBuf::from(path)]),
+                Ok(None) => Picked::Cancelled,
+                Err(error) => Picked::Failed(error),
+            };
+            state.lock().unwrap_or_else(|e| e.into_inner()).finish(id.0, picked);
+            ctx.request_repaint();
+        });
+        id
+    }
+    fn can_pick(&self) -> bool { false }
+    fn browser_saves(&self) -> bool { true }
 }

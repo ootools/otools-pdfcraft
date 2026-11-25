@@ -1,15 +1,9 @@
-//! PdfCraft 的 OTools 插件外壳。
-//!
-//! 本文件改编自上游 `apps/pdfcraft-web/src/main.rs`（上游 eframe web runner 的外壳）。
-//! 改动只有三处，都是「把浏览器能力换成 OTools 宿主能力」：
-//!
-//! 1. `mod host`（嵌入页面的 postMessage 桥）→ `mod otools`（OTools 宿主桥，我们新写的）
-//! 2. `app.host_save` 走 [`otools::deliver`]（写盘），否则退回上游的浏览器下载
-//! 3. 首次启动时用 OTools 的界面主题给 egui 一个初始偏好
-//!
-//! 打开仍是上游的 rfd（浏览器里它用 `<input type=file>`），我们没法从外壳替换掉它：
-//! 见 AGENTS.md 的「已知限制」。
-//! 上游 `crates/*` 一律不改：它们按 upstream.pin 的 commit 拉取，保持原样才能干净地跟上上游。
+//! PdfCraft 的 OTools 外壳：安装 craft UI runtime 与文件服务，恢复偏好，
+//! 跟随宿主主题和语言，将宿主投递文件送进应用、保存结果送回宿主。
+//! 上游保持 pin 快照，定制字体与社区入口通过 shell/patches 重放。
+
+#[cfg(any(target_arch = "wasm32", test))]
+mod requests;
 
 #[cfg(target_arch = "wasm32")]
 mod otools;
@@ -18,7 +12,8 @@ mod otools;
 mod web {
     use std::cell::{Cell, RefCell};
 
-    use pdfcraft_ui_egui::{PdfCraftApp, theme::ThemePreference};
+    use pdfcraft_ui_egui::{PdfCraftApp, AppServices};
+    use craft::theme::ModeChoice as ThemePreference;
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen::JsCast as _;
 
@@ -59,7 +54,7 @@ mod web {
             // 宿主投递的「打开方式」：系统里双击已绑定扩展名的 PDF → 用本插件打开。
             // 字节由 JS 侧读好（`otools::drain_delivered`），这里只负责交给上游。
             for file in crate::otools::drain_delivered() {
-                if let Err(error) = self.app.open_bytes(&file.name, file.path, file.bytes) {
+                if let Err(error) = self.app.open_bytes(ctx, &file.name, file.path, file.bytes) {
                     log::warn!("could not open delivered {}: {error}", file.name);
                 }
             }
@@ -94,22 +89,31 @@ mod web {
                     canvas,
                     options,
                     Box::new(|cc| {
-                        let mut app = PdfCraftApp::new();
-                        // wasm 读不到系统字体：内嵌 CJK + 阿拉伯 fallback，否则中文/日文/阿拉伯文方框。
-                        pdfcraft_ui_egui::theme::set_extra_fallback_fonts(vec![
-                            ("otools-cjk".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/otools-cjk-subset.ttf")))),
-                            ("otools-arabic".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/otools-arabic-subset.ttf")))),
+                        pdfcraft_ui_egui::fonts::set_extra_fallback_fonts(vec![
+                            craft::ui::fonts::EmbeddedFace { family: "OTools CJK", style: "Regular", scripts: &["Hans", "Hant", "Jpan", "Kore"], index: 0, bytes: include_bytes!("../assets/fonts/otools-cjk-subset.ttf"), role: None },
+                            craft::ui::fonts::EmbeddedFace { family: "OTools Arabic", style: "Regular", scripts: &["Arab"], index: 0, bytes: include_bytes!("../assets/fonts/otools-arabic-subset.ttf"), role: None },
                         ]);
-                        // "printcraft"：以应用旧名保存过的设置。
-                        if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string("printcraft"))) {
-                            app.restore(&json);
-                        }
+                        let settings = pdfcraft_ui_egui::settings::open();
+                        let lang = pdfcraft_ui_egui::i18n::Lang::from_pref(&host_lang_code(&crate::otools::host_language()));
+                        let ctx = cc.egui_ctx.clone();
+                        let system = craft::ui::runtime::env::SystemReader::start(move || ctx.request_repaint());
+                        let spec = craft::ui::InstallSpec::new(
+                            craft::host::target::ShellInfo::default(),
+                            std::sync::Arc::new(craft::window::system::SystemWindows),
+                        ).system(system);
+                        craft::ui::shell::embed::install(&cc.egui_ctx, spec, &pdfcraft_ui_egui::fonts::ui_fonts(lang))
+                            .map_err(|e| format!("UI runtime: {e}"))?;
+                        let ctx = cc.egui_ctx.clone();
+                        let wake = craft::host::Wake::new(move || ctx.request_repaint());
+                        let (intake, _) = craft::platform::open::FileIntake::new(wake);
+                        let files = crate::otools::HostFiles::new(cc.egui_ctx.clone());
+                        let host = craft::host::Host::builder(pdfcraft_ui_egui::APP_INFO)
+                            .files(std::sync::Arc::new(files)).build();
+                        let mut app = PdfCraftApp::with_host(std::sync::Arc::new(host), AppServices::system(&cc.egui_ctx, intake));
+                        app.apply_settings(&settings.get());
+                        app.attach_settings(settings);
+                        crate::otools::install(cc.egui_ctx.clone());
                         if crate::otools::available() {
-                            // 保存：交给宿主写盘（否则退回上游网页版的浏览器下载）。
-                            let save_as_host: pdfcraft_ui_egui::HostSaveFn =
-                                Box::new(|name: &str, bytes: &[u8], save_as: bool| crate::otools::deliver(name, bytes, save_as));
-                            app.host_save = Some(save_as_host);
-                            crate::otools::install(app.failed_inbox.clone(), cc.egui_ctx.clone());
                             // 用户还没在「选项」里定过主题时才跟随 OTools（插件 webview 的
                             // prefers-color-scheme 不一定等于宿主主题）。
                             if app.theme_preference == ThemePreference::System {
