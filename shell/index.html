@@ -144,18 +144,113 @@
       }
 
       /** 弹另存对话框，返回选中的路径（取消为 null）。 */
-      function pickSavePath(defaultPath) {
+      function pickSavePath(defaultPath, filters, title) {
         var a = wrapper();
-        if (a) return a.dialog.save({ title: '保存 PDF', defaultPath: defaultPath, filters: PDF_FILTERS }).then(firstPath);
+        if (a) return a.dialog.save({ title: title || '保存 PDF', defaultPath: defaultPath, filters: filters || PDF_FILTERS }).then(firstPath);
         var invoke = tauriInvoke();
         if (!invoke) return fail('OTools 宿主不可用');
         var sp = splitPath(defaultPath);
         return invoke('tools_webview_pick_save_path', {
-          options: { title: '保存 PDF', suggestedName: sp.fileName, directory: sp.directory, filters: PDF_FILTERS },
+          options: { title: title || '保存 PDF', suggestedName: sp.fileName, directory: sp.directory, filters: filters || PDF_FILTERS },
         }).then(function (meta) {
           if (!meta) return null;
           return typeof meta === 'string' ? meta.trim() || null : (meta.path ? String(meta.path).trim() || null : null);
         });
+      }
+
+      /** 弹文件夹选择对话框，返回目录路径（取消为 null）。批量导出时的目标目录。 */
+      function pickFolder() {
+        var a = wrapper();
+        if (a && a.dialog && typeof a.dialog.open === 'function') {
+          return a.dialog.open({ title: '选择导出文件夹', directory: true }).then(firstPath);
+        }
+        var invoke = tauriInvoke();
+        if (!invoke) return fail('OTools 宿主不可用');
+        return invoke('tools_webview_pick_folder', {
+          options: { title: '选择导出文件夹' },
+        }).then(function (meta) {
+          if (!meta) return null;
+          return typeof meta === 'string' ? meta.trim() || null : (meta.path ? String(meta.path).trim() || null : null);
+        });
+      }
+
+      /**
+       * 同一微任务批次内的多次 saveFile 聚合成一次「选择文件夹」，把各文件按 name 写进去。
+       *
+       * PdfCraft 导出多页图片时会在同一帧连续 write 每一页（WASM 侧 export_jobs.run_inline），
+       * 每页都是一次 forcePick 的另存。若逐次弹原生另存 sheet，N 个 sheet 并发会互相覆盖，
+       * 用户只会看到最后一个（最后一页），前面几页的保存被丢弃——表现就是「只导出最后一页」。
+       * 用一个 batch 收集同一 tick 内的请求：>1 个则只弹一次文件夹对话框，全部写进去；
+       * 单个仍走原来的另存/覆盖逻辑，行为不变。
+       */
+      var saveBatch = [];
+      var saveBatchScheduled = false;
+      function scheduleSaveBatch(item) {
+        saveBatch.push(item);
+        if (saveBatchScheduled) return;
+        saveBatchScheduled = true;
+        Promise.resolve().then(flushSaveBatch);
+      }
+      function flushSaveBatch() {
+        var items = saveBatch;
+        saveBatch = [];
+        saveBatchScheduled = false;
+        if (!items.length) return;
+        if (items.length === 1) {
+          saveOne(items[0]);
+          return;
+        }
+        // 批量：只弹一次文件夹选择，然后逐文件写入该目录（名字各自独立，不再互相覆盖）。
+        pickFolder().then(function (dir) {
+          if (!dir) {
+            items.forEach(function (it) { it.resolve(null); });
+            diag({ lastSaveMode: 'folder-dialog-cancelled' });
+            return;
+          }
+          var writes = items.map(function (it) {
+            var path = joinPath(dir, it.name);
+            return writeHostFile(path, it.request.dataBase64).then(function () {
+              return { name: it.name, path: path };
+            });
+          });
+          return Promise.all(writes).then(function (paths) {
+            var map = loadMap();
+            paths.forEach(function (p) { map[p.name] = p.path; });
+            saveMap(map);
+            diag({ lastSaveMode: 'folder-batch', count: paths.length, dir: dir });
+            items.forEach(function (it, i) { it.resolve({ path: paths[i].path }); });
+          }, function (e) {
+            items.forEach(function (it) { it.reject(e); });
+          });
+        }, function (e) {
+          items.forEach(function (it) { it.reject(e); });
+        });
+      }
+      function joinPath(dir, name) {
+        var base = String(dir || '').replace(/[\\/]+$/, '');
+        var leaf = String(name || '').replace(/^[\\/]+/, '');
+        return base + (base.match(/^[A-Za-z]:$/) ? '\\' : '/') + leaf;
+      }
+      function saveOne(item) {
+        var req = item.request;
+        var name = item.name;
+        var map = loadMap();
+        var known = (typeof req.path === 'string' && req.path) || map[name];
+        if (!req.forcePick && known) {
+          return writeHostFile(known, req.dataBase64).then(function () {
+            diag({ lastSave: known, lastSaveMode: 'overwrite' });
+            item.resolve({ path: known });
+          }, item.reject);
+        }
+        return pickSavePath(known || name, item.filters, item.title).then(function (path) {
+          if (!path) { item.resolve(null); return; }
+          map[name] = path;
+          saveMap(map);
+          return writeHostFile(path, req.dataBase64).then(function () {
+            diag({ lastSave: path, lastSaveMode: 'dialog' });
+            item.resolve({ path: path });
+          }, item.reject);
+        }, item.reject);
       }
 
       /* ---------- 宿主投递的「打开方式」 ---------- */
@@ -257,9 +352,11 @@
 
         /**
          * 保存 PDF。
-         * @param {{name: string, dataBase64: string, forcePick: boolean}} request
+         * @param {{name: string, dataBase64: string, forcePick: boolean,
+         *          filters?: Array, title?: string}} request
          *   `forcePick` 为真时总是弹另存对话框（对应「另存为」），否则若该文件名
-         *   上次存过就静默覆盖（对应「保存」）。
+         *   上次存过就静默覆盖（对应「保存」）。同一批次多次调用会合并成一次文件夹
+         *   选择（多页导出），各自按 name 写入。
          * @returns {Promise<{path: string}|null>} null 表示用户在对话框里取消了。
          */
         saveFile: function (request) {
@@ -267,21 +364,14 @@
           var name = String(req.name || 'document.pdf');
           if (!hostReady()) return fail('OTools 保存对话框不可用');
 
-          var map = loadMap();
-          var known = (typeof req.path === 'string' && req.path) || map[name];
-          if (!req.forcePick && known) {
-            return writeHostFile(known, req.dataBase64).then(function () {
-              diag({ lastSave: known, lastSaveMode: 'overwrite' });
-              return { path: known };
-            });
-          }
-          return pickSavePath(known || name).then(function (path) {
-            if (!path) return null;
-            map[name] = path;
-            saveMap(map);
-            return writeHostFile(path, req.dataBase64).then(function () {
-              diag({ lastSave: path, lastSaveMode: 'dialog' });
-              return { path: path };
+          return new Promise(function (resolve, reject) {
+            scheduleSaveBatch({
+              request: req,
+              name: name,
+              filters: req.filters,
+              title: req.title,
+              resolve: resolve,
+              reject: reject,
             });
           });
         }
