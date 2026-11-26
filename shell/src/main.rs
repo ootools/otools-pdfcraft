@@ -20,6 +20,28 @@ mod web {
     const CANVAS_ID: &str = "pdfcraft";
     const LOADING_ID: &str = "pdfcraft_loading";
 
+    /// OTools 的默认布局：导航面板（书签、缩略图、注释……）靠左，工具面板靠右。
+    ///
+    /// 上游默认是「工具在左、导航在右」，与国内用户习惯相反。这里用上游暴露的公开 API
+    /// （`side_panels::state` / `command`；均经 `pub use panels::side_panels` 导出）把两者对调：
+    /// 把导航轨道移到左（`rail_side=left`），把工具面板移到右（`panel=tools, edge=right`）。
+    ///
+    /// 只在当前仍是「工具左 + 导航右」这一上游默认朝向时才翻转。用户一旦在「选项」里
+    /// 自己改过（工具已在右，或导航已在左），就不再干预——既尊重用户选择，也保证幂等。
+    fn apply_otools_default_layout(app: &mut PdfCraftApp) {
+        use pdfcraft_ui_egui::side_panels;
+
+        let st = side_panels::state(app);
+        let tools_left = st.get("tools_side").and_then(|v| v.as_str()) == Some("left");
+        let rail_right = st.get("rail_side").and_then(|v| v.as_str()) == Some("right");
+        if !(tools_left && rail_right) {
+            return;
+        }
+        // 先挪工具到右边，再把导航轨道挪到左边；两者都经上游的 command 走同一套校验。
+        let _ = side_panels::command(app, false, &serde_json::json!({ "panel": "tools", "edge": "right" }));
+        let _ = side_panels::command(app, false, &serde_json::json!({ "rail_side": "left" }));
+    }
+
     /// 包一层应用：注入「跟随宿主语言」与「屏蔽社区外链」，其余原样转发给 `PdfCraftApp`。
     struct WebShell {
         app: PdfCraftApp,
@@ -111,6 +133,10 @@ mod web {
                             .files(std::sync::Arc::new(files)).build();
                         let mut app = PdfCraftApp::with_host(std::sync::Arc::new(host), AppServices::system(&cc.egui_ctx, intake));
                         app.apply_settings(&settings.get());
+                        // OTools 默认布局：书签/缩略图等导航面板在左，工具面板在右（更符合用户习惯）。
+                        // 上游默认是「工具左、导航右」；仅当用户尚未手动调整过（仍是上游默认朝向）时才翻转，
+                        // 这样尊重用户在「选项」里自己选过的结果，也不会每次启动反复横跳。
+                        apply_otools_default_layout(&mut app);
                         app.attach_settings(settings);
                         crate::otools::install(cc.egui_ctx.clone());
                         if crate::otools::available() {

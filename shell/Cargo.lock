@@ -5956,6 +5956,7 @@ dependencies = [
  "js-sys",
  "log",
  "pdfcraft-ui-egui",
+ "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
